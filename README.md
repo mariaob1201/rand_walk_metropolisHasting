@@ -17,4 +17,4 @@ Generates and saves a trace plot for the provided samples.
   
 ## Metropolis Hasting
 ![Trace plot](https://github.com/mariaob1201/rand_walk_metropolisHasting/blob/main/trace_plot.jpg)
-![Posterior density](https://github.com/mariaob1201/rand_walk_metropolisHasting/blob/main/posterior_density.jpg)
+![Posterior density](https://github.com/mariaob1201/rand_walk_metropolisHasting/blob/main/posterior_density_plot.jpg)
