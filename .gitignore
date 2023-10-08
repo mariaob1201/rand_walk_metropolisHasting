@@ -1,0 +1,7 @@
+# .gitignore
+
+# Ignore virtual environment
+venv/
+
+# Ignore JetBrains IDE settings
+.idea/
