@@ -90,11 +90,8 @@ def main(y, mu, std):
     trace_plot([arr for arr in posterior_samples[0]], description)
     return posterior_samples
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     y = [1.2, 1.4, -.5, .3, .9, 2.3, 1, .1, 1.3, 1.9]
     std = 0.9
-    mu = 30 # crazy intial value
+    mu = 30 # crazy intial value to test how
     main(y, mu, std)
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
