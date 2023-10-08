@@ -3,6 +3,7 @@ import matplotlib
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 """
 So yi represents the percent change in personnel for company i, and given mu, the mean,
@@ -45,9 +46,9 @@ def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
     for i in range(0, n_iter):
         mu_cand = np.random.normal(mu_now, cand_std, 1)
         lg_cand = log_g_fun(mu_cand, n, y_bar)
+
         # Acceptance ratio
         lalpha = lg_cand - lg_now
-        #print(f"lalpha {lalpha[0]}")
         alpha = np.exp(lalpha[0])
 
         u = random.random()
@@ -66,6 +67,12 @@ def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
     return [mu_out, accept/n_iter]
 
 def trace_plot(samples, description):
+    """
+    trace plot on MC
+    :param samples:
+    :param description:
+    :return:
+    """
 
     # Plot the trace plot
     plt.figure(figsize=(10, 5))
@@ -75,6 +82,22 @@ def trace_plot(samples, description):
     plt.ylabel("Value")
     # Save the plot as a JPG image
     plt.savefig("trace_plot.jpg", format="jpg", dpi=300)
+
+def density_estimate_plot(samples, description):
+    """
+    Plot the posterior density using kernel density estimation.
+    :param samples: List of posterior samples.
+    """
+
+    plt.figure(figsize=(10, 5))
+    plt.hist(samples, bins=50, density=True, alpha=0.7, label='Posterior Density')
+    plt.title(f"Posterior Density Plot for {description}")
+    plt.xlabel("Value")
+    plt.ylabel("Density")
+    # Save the plot as a JPG image
+    filename = "posterior_density_plot.jpg"
+    plt.savefig(filename, format="jpg", dpi=300)
+    plt.show()
 
 # set up
 def main(y, mu, std):
@@ -86,9 +109,9 @@ def main(y, mu, std):
     posterior_samples = metropolis_hastings(n, ybar, 1000, mu, std)
     print('Posterior: ', posterior_samples[0])
     print('Acceptance Ratio: ', posterior_samples[-1])
-    description = f"Mean {mu} and Std {std}"
-    trace_plot([arr for arr in posterior_samples[0]], description)
-    return posterior_samples
+
+    trace_plot([arr for arr in posterior_samples[0]], f"Mean {mu} and Std {std}")
+    density_estimate_plot([arr for arr in posterior_samples[0]], "Density estimate on posterior distribution ")
 
 if __name__ == '__main__':
     y = [1.2, 1.4, -.5, .3, .9, 2.3, 1, .1, 1.3, 1.9]
