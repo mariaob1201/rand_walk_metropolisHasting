@@ -5,15 +5,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import t
 
-"""
-So yi represents the percent change in personnel for company i, and given mu, the mean,
-each of these ys is identically distributed and independent from this normal distribution
-with mean mu and variance 1. Our prior distribution on mu is the t-distribution with location 0,
-scale parameter 1 and degrees of freedom 1.
-
-To get posterior samples, we're going to need to setup a Markov chain,
-who's stationary distribution is the posterior distribution we want.
-"""
 
 def log_g_fun(mu, n, y_bar):
     """
@@ -42,7 +33,7 @@ def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
     mu_now = mu_init
     lg_now = log_g_fun(mu_now, n, y_bar)
 
-    # Iterations
+    # MC iterations
     for i in range(0, n_iter):
         mu_cand = np.random.normal(mu_now, cand_std, 1)
         lg_cand = log_g_fun(mu_cand, n, y_bar)
@@ -150,5 +141,5 @@ def main(y, mu, std):
 if __name__ == '__main__':
     y = [1.2, 1.4, -.5, .3, .9, 2.3, 1, .1, 1.3, 1.9]
     std = 0.9
-    mu = 30 # crazy intial value to test how
+    mu = 30 # crazy intial value to test how many iterations are needed to get close to the true mean
     main(y, mu, std)
