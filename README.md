@@ -12,7 +12,7 @@ Key Functions:
 - metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std): Implements the Metropolis-Hastings algorithm. Returns posterior samples and acceptance ratio.
   
 ## Metropolis Hasting
-Convergence to this distribution for the validity of the samples drawn.
+Convergence to this distribution for the validity of the samples drawn. Our init mean was far from the real in order to test how many samples are needed to get close.
 ![Trace plot](https://github.com/mariaob1201/rand_walk_metropolisHasting/blob/main/trace_plot.jpg)
 
 Density comparisons prior vs posterior: the posterior shortens the true mean of the data.
