@@ -9,10 +9,7 @@ The goal is to sample from the posterior distribution of the first using the Met
 
 Key Functions:
 - log_g_fun(mu, n, y_bar): Computes the log posterior distribution for mu
-- metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std)
-Implements the Metropolis-Hastings algorithm. Returns posterior samples and acceptance ratio.
-- trace_plot(samples, description)
-Generates and saves a trace plot for the provided samples.
+- metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std): Implements the Metropolis-Hastings algorithm. Returns posterior samples and acceptance ratio.
   
 ## Metropolis Hasting
 Convergence to this distribution for the validity of the samples drawn.
