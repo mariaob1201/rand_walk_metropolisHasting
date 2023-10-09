@@ -112,7 +112,7 @@ def plot_t_density(df=1, lty='--', add=False):
     plt.ylabel("Density")
 
 
-def density_estimate_plot(samples, description, x_range=(-1,3)):
+def density_estimate_plot(samples, description, x_range, prior_mean):
     """
     Plot the posterior density using kernel density estimation.
     :param samples: List of posterior samples.
@@ -126,6 +126,9 @@ def density_estimate_plot(samples, description, x_range=(-1,3)):
     plt.title(description)
 
     plt.xlim(x_range)
+    # Piro mean
+    plt.axvline(prior_mean, color='red', linestyle='-', label='y_bar on prior')
+
     plt.xlabel("Value")
     plt.ylabel("Density")
     # Save the plot as a JPG image
@@ -148,8 +151,8 @@ def main(y, mu, std):
     #print('Posterior: ', posterior_samples[0])
     print('Acceptance Ratio: ', posterior_samples[-1])
 
-    trace_plot(samples, f"Mean {mu} and Std {std}")
-    density_estimate_plot(samples, "Density estimate on posterior distribution ")
+    trace_plot(samples, f"Mean {ybar} and Std {std}")
+    density_estimate_plot(samples, "Density estimate on posterior distribution ", (-1,3), ybar)
 
 if __name__ == '__main__':
     y = [1.2, 1.4, -.5, .3, .9, 2.3, 1, .1, 1.3, 1.9]
