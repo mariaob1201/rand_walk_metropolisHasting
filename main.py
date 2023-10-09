@@ -8,7 +8,7 @@ from scipy.stats import t
 
 def log_g_fun(mu, n, y_bar):
     """
-    posterior distribution for mu, log(g(mu))
+    In this case we take the log-posterior distribution for mu, log(g(mu)), as follows
     :param y_hat:
     :param n:
     :param mu:
@@ -98,9 +98,14 @@ def plot_t_density(df=1, lty='--', add=False):
 
 def density_estimate_plot(samples, description, x_range, prior_mean):
     """
-    Plot the posterior density using kernel density estimation.
-    :param samples: List of posterior samples.
+
+    :param samples: list of posterior samples
+    :param description:
+    :param x_range:
+    :param prior_mean:
+    :return:
     """
+
     plt.figure(figsize=(10, 5))
     # Posterior
     data = pd.DataFrame(samples, columns=['sampling'])
@@ -125,21 +130,27 @@ def density_estimate_plot(samples, description, x_range, prior_mean):
 
 # set up
 def main(y, mu, std):
-    # seed
+    """
+
+    :param y:
+    :param mu:
+    :param std:
+    :return:
+    """
     random.seed(42)
     ybar = np.mean(y)
     n = len(y)
 
     posterior_samples = metropolis_hastings(n, ybar, 1000, mu, std)
     samples = [arr for arr in posterior_samples[0]]
-    #print('Posterior: ', posterior_samples[0])
-    print('Acceptance Ratio: ', posterior_samples[-1])
 
-    trace_plot(samples, f"Mean {ybar} and Std {std}")
+    trace_plot(samples, f"Mean {ybar} and Std {std} -- Acceptance ratio {posterior_samples[-1]}")
     density_estimate_plot(samples, "Density estimate on posterior distribution ", (-1,3), ybar)
 
 if __name__ == '__main__':
+    # Example
     y = [1.2, 1.4, -.5, .3, .9, 2.3, 1, .1, 1.3, 1.9]
     std = 0.9
-    mu = 30 # crazy intial value to test how many iterations are needed to get close to the true mean
+    # crazy intial value to test how many iterations are needed to get close to the true mean
+    mu = 30
     main(y, mu, std)
