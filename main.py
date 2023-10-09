@@ -3,7 +3,9 @@ import matplotlib
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+import pandas as pd
+import scipy
+from scipy.stats import gaussian_kde
 
 """
 So yi represents the percent change in personnel for company i, and given mu, the mean,
@@ -83,18 +85,53 @@ def trace_plot(samples, description):
     # Save the plot as a JPG image
     plt.savefig("trace_plot.jpg", format="jpg", dpi=300)
 
-def density_estimate_plot(samples, description):
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import t
+
+
+def plot_t_density(df=1, lty='--', add=False):
+    """
+    Plot the density of the t-distribution with specified degrees of freedom.
+
+    Parameters:
+    - df: degrees of freedom (default is 1).
+    - lty: line style (default is '--', which corresponds to lty=2 in R).
+    - add: whether to add to the existing plot or create a new one (default is False).
+    """
+    x = np.linspace(-1, 3, 400)
+    y = t.pdf(x, df)
+
+    if not add:
+        plt.figure()
+
+    plt.plot(x, y, linestyle=lty, color='blue', label='Prior Distribution')
+    plt.legend()
+    plt.xlabel("Value")
+    plt.ylabel("Density")
+
+
+def density_estimate_plot(samples, description, x_range=(-1,3)):
     """
     Plot the posterior density using kernel density estimation.
     :param samples: List of posterior samples.
     """
-
     plt.figure(figsize=(10, 5))
-    plt.hist(samples, bins=50, density=True, alpha=0.7, label='Posterior Density')
-    plt.title(f"Posterior Density Plot for {description}")
+    # Posterior
+    data = pd.DataFrame(samples, columns=['sampling'])
+    data.sampling.plot.density(color='green', label='Posterior Distribution')
+
+    plt.legend()
+    plt.title(description)
+
+    plt.xlim(x_range)
     plt.xlabel("Value")
     plt.ylabel("Density")
     # Save the plot as a JPG image
+    plot_t_density(df=1, lty='--', add=True)
+    plt.title(f'Prior and Posterior')
+
     filename = "posterior_density_plot.jpg"
     plt.savefig(filename, format="jpg", dpi=300)
     plt.show()
@@ -107,11 +144,12 @@ def main(y, mu, std):
     n = len(y)
 
     posterior_samples = metropolis_hastings(n, ybar, 1000, mu, std)
-    print('Posterior: ', posterior_samples[0])
+    samples = [arr for arr in posterior_samples[0]]
+    #print('Posterior: ', posterior_samples[0])
     print('Acceptance Ratio: ', posterior_samples[-1])
 
-    trace_plot([arr for arr in posterior_samples[0]], f"Mean {mu} and Std {std}")
-    density_estimate_plot([arr for arr in posterior_samples[0]], "Density estimate on posterior distribution ")
+    trace_plot(samples, f"Mean {mu} and Std {std}")
+    density_estimate_plot(samples, "Density estimate on posterior distribution ")
 
 if __name__ == '__main__':
     y = [1.2, 1.4, -.5, .3, .9, 2.3, 1, .1, 1.3, 1.9]
