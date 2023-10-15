@@ -1,4 +1,3 @@
-# This is a sample Python script.
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,13 +13,13 @@ def log_g_fun(mu, n, y_bar):
     :param mu:
     :return:
     """
-    log_g_mu = n*(y_bar*mu - .5*mu*mu)-np.log(mu*mu+1)
+    log_g_mu = n*(y_bar*mu - .5*mu**2)-np.log(1+mu**2)
     return log_g_mu
 
 def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
     """
     Metropolis hastings
-    :param n:
+    :param n: sample size
     :param y_bar: the sample mean of y.
     :param n_iter: how many iterations
     :param mu_init: initial valur for mu
@@ -43,6 +42,7 @@ def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
         alpha = np.exp(lalpha[0])
 
         u = random.random()
+        # Acceptance condition to update the candidate
         if u<alpha:
             mu_now_ = mu_cand
             try:
@@ -54,7 +54,8 @@ def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
             lg_now = lg_cand
 
         mu_out.append(mu_now)
-
+    
+    #returning the mean estimated together with acceptance ratio
     return [mu_out, accept/n_iter]
 
 def trace_plot(samples, description):
@@ -150,7 +151,7 @@ def main(y, mu, std):
 if __name__ == '__main__':
     # Example
     y = [1.2, 1.4, -.5, .3, .9, 2.3, 1, .1, 1.3, 1.9]
-    std = 0.9
-    # crazy intial value to test how many iterations are needed to get close to the true mean
-    mu = 30
+    std = np.std(y)
+    
+    mu = 30 # crazy intial value to test how many iterations are needed to get close to the true mean
     main(y, mu, std)
