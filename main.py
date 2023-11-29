@@ -5,7 +5,7 @@ import pandas as pd
 from scipy.stats import t
 
 
-def log_g_fun(mu, n, y_bar):
+def log_pi_fun(mu, n, y_bar):
     """
     For computational reasons we take the log-posterior of the target function g, log(g(mu)), as follows
     :param y_hat:
@@ -30,13 +30,13 @@ def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
     mu_out = [] #numeric vector of mu accepted values
     accept = 0 #how many times we accepted
     mu_now = mu_init #updating our value for mu, intitalized as the mu_init, our param
-    lg_now = log_g_fun(mu_now, n, y_bar) #evaluation of lg function
+    lg_now = log_pi_fun(mu_now, n, y_bar) #evaluation of lg function
 
     # MC iterations under accepting ratio
     for i in range(0, n_iter):
         mu_cand = np.random.normal(mu_now, cand_std, 1) #draw a candidate from the proposal distribution, normal with mean mu_now and std =cand_std
         #by last candidate assumption, a symmetric one, we now turn into a Metropolis algorithm 
-        lg_cand = log_g_fun(mu_cand, n, y_bar) #the numerator of the acceptance ration, in a logarithm scale
+        lg_cand = log_pi_fun(mu_cand, n, y_bar) #the numerator of the acceptance ration, in a logarithm scale
 
         # Acceptance ratio
         lalpha = lg_cand - lg_now #this is the log ratio, for posterior on the candidate minus the current value lg_now
