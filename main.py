@@ -7,7 +7,7 @@ from scipy.stats import t
 
 def log_g_fun(mu, n, y_bar):
     """
-    In this case we take the log-posterior distribution for mu, log(g(mu)), as follows
+    For computational reasons we take the log-posterior of the target function g, log(g(mu)), as follows
     :param y_hat:
     :param n:
     :param mu:
@@ -20,30 +20,31 @@ def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
     """
     Metropolis hastings
     :param n: sample size
-    :param y_bar: the sample mean of y.
+    :param y_bar: the sample mean of y the data.
     :param n_iter: how many iterations
     :param mu_init: initial valur for mu
-    :param cand_std: std deviation for candidate
-    :return:
+    :param cand_std: std deviation for the candidate generating normal distribution
+    :return: 
     """
-    # Selecting an initial value
-    mu_out = []
-    accept = 0
-    mu_now = mu_init
-    lg_now = log_g_fun(mu_now, n, y_bar)
+    # Selecting an initial values and initializing the Random walk Metropolis sampling
+    mu_out = [] #numeric vector of mu accepted values
+    accept = 0 #how many times we accepted
+    mu_now = mu_init #updating our value for mu, intitalized as the mu_init, our param
+    lg_now = log_g_fun(mu_now, n, y_bar) #evaluation of lg function
 
-    # MC iterations
+    # MC iterations under accepting ratio
     for i in range(0, n_iter):
-        mu_cand = np.random.normal(mu_now, cand_std, 1)
-        lg_cand = log_g_fun(mu_cand, n, y_bar)
+        mu_cand = np.random.normal(mu_now, cand_std, 1) #draw a candidate from the proposal distribution, normal with mean mu_now and std =cand_std
+        #by last candidate assumption, a symmetric one, we now turn into a Metropolis algorithm 
+        lg_cand = log_g_fun(mu_cand, n, y_bar) #the numerator of the acceptance ration, in a logarithm scale
 
         # Acceptance ratio
-        lalpha = lg_cand - lg_now
-        alpha = np.exp(lalpha[0])
+        lalpha = lg_cand - lg_now #this is the log ratio, for posterior on the candidate minus the current value lg_now
+        alpha = np.exp(lalpha[0]) #turned it back into a non log-scale
 
         u = random.random()
         # Acceptance condition to update the candidate
-        if u<alpha:
+        if u<alpha: #that gives us an event that happens with probability alpha
             mu_now_ = mu_cand
             try:
                 mu_now = mu_now_[0]
@@ -51,7 +52,7 @@ def metropolis_hastings(n, y_bar, n_iter, mu_init, cand_std):
                 mu_now = mu_now_
 
             accept+=1
-            lg_now = lg_cand
+            lg_now = lg_cand #updated the lg_now too as the one evaluated in the candidate
 
         mu_out.append(mu_now)
     
