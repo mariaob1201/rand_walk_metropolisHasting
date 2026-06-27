@@ -1,7 +1,30 @@
 # .gitignore
 
-# Ignore virtual environment
+# Virtual environment
 venv/
+.venv/
+env/
 
-# Ignore JetBrains IDE settings
+# IDE settings
 .idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Generated output files (keep the directory via .gitkeep)
+outputs/*.png
+outputs/*.jpg
+outputs/*.pdf
+
+# Root-level legacy plot files
+*.jpg
+*.png
+
