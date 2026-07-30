@@ -1,19 +1,44 @@
-# Random Walk Metropolis-Hastings Sampler
+# MCMC Samplers — Random Walk Metropolis-Hastings & Hamiltonian Monte Carlo
 
-A research-oriented Python implementation of the **Random Walk Metropolis-Hastings (RWMH)** algorithm for Bayesian posterior sampling.
+A research-oriented Python implementation of MCMC samplers for Bayesian posterior sampling:
+**Random Walk Metropolis-Hastings (RWM)** and **Hamiltonian Monte Carlo (HMC)**.
 
-The sampler is decoupled from any specific model: any log-target function can be passed in, enabling rapid experimentation with different priors, likelihoods, and targets.
+Every sampler is decoupled from any specific model: any log-target (and, for HMC, its
+gradient) can be passed in, enabling rapid experimentation with different priors,
+likelihoods, and targets — and side-by-side comparison between sampling methods.
 
 ---
 
 ## Motivation
 
-Metropolis-Hastings is the foundational MCMC algorithm underlying modern Bayesian inference. This repository demonstrates:
+Metropolis-Hastings is the foundational MCMC algorithm underlying modern Bayesian inference,
+and HMC is the gradient-based method that most modern probabilistic programming tools
+(Stan, PyMC, NumPyro) build on. This repository demonstrates:
 
-- How to implement RWMH from first principles (no black-box dependencies)
+- How to implement RWM and HMC from first principles (no black-box dependencies)
 - How burn-in, thinning, and multiple chains affect inference quality
 - How to diagnose convergence rigorously (ESS, R-hat, ACF)
-- How proposal width controls the exploration-exploitation tradeoff — illustrated with a bimodal stress-test target
+- How proposal width controls RWM's exploration-exploitation tradeoff — illustrated with a bimodal stress-test target
+- Where HMC wins (near-i.i.d. draws on smooth, unimodal posteriors) and where it doesn't (well-separated multimodal targets) — see [Sampling methods](#sampling-methods)
+
+---
+
+## Sampling methods
+
+| | Random Walk Metropolis-Hastings | Hamiltonian Monte Carlo |
+|---|---|---|
+| Module | `src/samplers/random_walk.py` | `src/samplers/hmc.py` |
+| Needs | `log_target` only | `log_target` **and** `grad_log_target` |
+| Tuning knob | `cand_std` (proposal width) | `step_size`, `n_leapfrog` |
+| Cost per iteration | 1 target evaluation | `n_leapfrog` target + gradient evaluations |
+| Best for | any target, including multimodal / non-differentiable ones; cheap to evaluate; quick to set up | smooth, differentiable, roughly unimodal targets where gradients are cheap — much lower autocorrelation per sample |
+| Weak spot | high autocorrelation → many iterations needed for effective samples | well-separated multimodal targets — a single trajectory rarely has enough kinetic energy to cross a low-density valley between modes; also sensitive to `step_size`/`n_leapfrog` choice (see `hmc.py`'s step-size jitter, added to avoid resonance with near-quadratic targets) |
+
+Use RWM as the default, general-purpose choice — it needs nothing but a log-density and
+works reasonably everywhere. Reach for HMC when the target is differentiable and you need
+many effective samples cheaply from a well-behaved (e.g. roughly Gaussian-shaped) posterior.
+`examples/compare_samplers.py` runs both on the same targets and prints/plots the difference
+directly; see the "RWM vs HMC" results table further down in [Sample outputs](#sample-outputs).
 
 ---
 
@@ -167,7 +192,10 @@ All plots are saved to `outputs/`.
 
 ![Trace plot](https://github.com/mariaob1201/rand_walk_metropolisHasting/blob/main/trace_plot.jpg)
 
-**Prior vs Posterior** — the likelihood concentrates the Cauchy prior around ȳ = 0.99:
+**Prior vs Posterior (RWM vs HMC)** — the likelihood concentrates the Cauchy prior around
+ȳ = 0.99; both samplers (produced by `main.py`) agree on the mode, but HMC's near-i.i.d.
+draws (fewer iterations wasted on autocorrelated steps) give a visibly sharper KDE than
+RWM's from the same 1000-iteration budget:
 
 ![Posterior density](https://github.com/mariaob1201/rand_walk_metropolisHasting/blob/main/posterior_density_plot.jpg)
 
@@ -230,3 +258,4 @@ Each algorithm lives in its own module under `src/samplers/`, exposed through `s
 - Gelman et al. (2013). *Bayesian Data Analysis* (3rd ed.), Ch. 11–12.
 - Geyer (1992). Practical Markov chain Monte Carlo. *Statistical Science*.
 - Roberts, Gelman & Gilks (1997). Weak convergence and optimal scaling of random walk Metropolis algorithms. *Annals of Applied Probability*.
+- Neal (2011). MCMC using Hamiltonian dynamics. In *Handbook of Markov Chain Monte Carlo*.

@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import t
 
-from src.samplers import metropolis_hastings
-from src.targets import make_normal_mean_target
+from src.samplers import metropolis_hastings, hamiltonian_monte_carlo
+from src.targets import make_normal_mean_target, make_normal_mean_grad
 
 
 def trace_plot(samples, description):
@@ -54,10 +54,11 @@ def plot_t_density(df=1, lty='--', add=False):
     plt.ylabel("Density")
 
 
-def density_estimate_plot(samples, description, x_range, prior_mean):
+def density_estimate_plot(samples_by_sampler, description, x_range, prior_mean):
     """
 
-    :param samples: list of posterior samples
+    :param samples_by_sampler: dict of {sampler_label: posterior samples} — one density
+        curve is drawn per entry, so multiple samplers can be overlaid on one plot
     :param description:
     :param x_range:
     :param prior_mean:
@@ -65,9 +66,11 @@ def density_estimate_plot(samples, description, x_range, prior_mean):
     """
 
     plt.figure(figsize=(10, 5))
-    # Posterior
-    data = pd.DataFrame(samples, columns=['sampling'])
-    data.sampling.plot.density(color='green', label='Posterior Distribution')
+    # Posterior — one curve per sampler
+    colors = ['green', 'darkorange', 'purple', 'brown']
+    for (label, samples), color in zip(samples_by_sampler.items(), colors):
+        data = pd.DataFrame(samples, columns=['sampling'])
+        data.sampling.plot.density(color=color, label=label)
 
     plt.legend()
     plt.title(description)
@@ -101,12 +104,23 @@ def main(y, mu, std):
     n = len(y)
 
     log_target = make_normal_mean_target(n, ybar)
-    result = metropolis_hastings(log_target, init=mu, n_iter=1000, cand_std=std, seed=42)
-    samples = result["samples"][0]
-    accept_rate = result["acceptance_rates"][0]
+    grad_target = make_normal_mean_grad(n, ybar)
 
-    trace_plot(samples, f"Mean {ybar} and Std {std} -- Acceptance ratio {accept_rate}")
-    density_estimate_plot(samples, "Density estimate on posterior distribution ", (-1, 3), ybar)
+    rwm_result = metropolis_hastings(log_target, init=mu, n_iter=1000, cand_std=std, seed=42)
+    hmc_result = hamiltonian_monte_carlo(log_target, grad_target, init=mu, n_iter=1000,
+                                         step_size=0.05, n_leapfrog=20, seed=42)
+
+    rwm_samples = rwm_result["samples"][0]
+    hmc_samples = hmc_result["samples"][0]
+
+    trace_plot(rwm_samples, f"Mean {ybar} and Std {std} -- Acceptance ratio {rwm_result['acceptance_rates'][0]}")
+    density_estimate_plot(
+        {
+            "RWM posterior": rwm_samples,
+            f"HMC posterior (accept={hmc_result['acceptance_rates'][0]:.2f})": hmc_samples,
+        },
+        "Density estimate on posterior distribution ", (-1, 3), ybar,
+    )
 
 
 if __name__ == '__main__':
