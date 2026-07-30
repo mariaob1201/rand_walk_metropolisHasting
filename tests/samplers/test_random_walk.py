@@ -4,11 +4,11 @@ Run with:  python -m pytest tests/ -v
 """
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import numpy as np
 import pytest
-from src.sampler import metropolis_hastings
+from src.samplers import metropolis_hastings
 from src.targets import make_normal_mean_target, bimodal_log_target
 from src.diagnostics import effective_sample_size, gelman_rubin, autocorrelation
 

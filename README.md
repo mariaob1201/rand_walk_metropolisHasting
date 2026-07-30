@@ -22,7 +22,9 @@ Metropolis-Hastings is the foundational MCMC algorithm underlying modern Bayesia
 ```
 rand_walk_metropolisHasting/
 ├── src/
-│   ├── sampler.py       # Generic RWMH — accepts any log_target callable
+│   ├── samplers/
+│   │   ├── random_walk.py  # Generic RWMH — accepts any log_target callable
+│   │   └── hmc.py           # Hamiltonian Monte Carlo (scaffolded, not yet implemented)
 │   ├── targets.py       # Log-posterior factories (Normal mean, bimodal mixture)
 │   ├── diagnostics.py   # ESS, Gelman-Rubin R-hat, autocorrelation
 │   └── plots.py         # Trace, ACF, posterior density, convergence plots
@@ -32,7 +34,8 @@ rand_walk_metropolisHasting/
 ├── notebooks/
 │   └── demo.ipynb       # Step-by-step research walkthrough
 ├── tests/
-│   └── test_sampler.py  # Pytest suite (shapes, convergence, diagnostics)
+│   └── samplers/
+│       └── test_random_walk.py  # Pytest suite (shapes, convergence, diagnostics)
 ├── outputs/             # Generated plots (gitignored, directory kept)
 ├── main.py              # Original single-file script (reference)
 └── requirements.txt
@@ -71,7 +74,7 @@ Used to study how the proposal standard deviation controls inter-mode mixing. A 
 ## Sampler API
 
 ```python
-from src.sampler import metropolis_hastings
+from src.samplers import metropolis_hastings
 
 result = metropolis_hastings(
     log_target = my_log_posterior,  # callable: float -> float
@@ -158,6 +161,21 @@ All plots are saved to `outputs/`.
 1. Add a `my_log_target(x: float) -> float` function to `src/targets.py`
 2. Pass it directly to `metropolis_hastings(log_target=my_log_target, ...)`
 3. No other changes needed
+
+---
+
+## Adding a new sampler
+
+Each algorithm lives in its own module under `src/samplers/`, exposed through `src/samplers/__init__.py`.
+To add one (e.g. HMC, which is scaffolded in `src/samplers/hmc.py` but not yet implemented):
+
+1. Write `src/samplers/<name>.py` with a function matching the existing signature style:
+   accepts `log_target` (plus whatever the algorithm needs, e.g. `grad_log_target` for HMC),
+   `init`, `n_iter`, `burn_in`, `thin`, `n_chains`, `seed`, and returns the same
+   `{"samples", "acceptance_rates", "n_iter", "burn_in", "thin"}` dict shape so it's a
+   drop-in replacement for `metropolis_hastings` in examples, diagnostics, and plots.
+2. Export it from `src/samplers/__init__.py`.
+3. Add tests under `tests/samplers/test_<name>.py`.
 
 ---
 
