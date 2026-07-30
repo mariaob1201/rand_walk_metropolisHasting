@@ -1,5 +1,12 @@
 import numpy as np
 
+"""
+Hamiltonian Monte Carlo (HMC) sampler.
+Slources:
+https://bayesianbrad.github.io/posts/2019_hmc.html
+https://bjlkeng.io/posts/hamiltonian-monte-carlo/
+https://faculty.washington.edu/yenchic/19A_stat535/Lec9_HMC.pdf
+"""
 
 def hamiltonian_monte_carlo(log_target, grad_log_target, init, n_iter, step_size,
                              n_leapfrog, burn_in=0, thin=1, n_chains=1, seed=None):
@@ -60,17 +67,22 @@ def hamiltonian_monte_carlo(log_target, grad_log_target, init, n_iter, step_size
         n_accept = 0
 
         for i in range(n_iter):
+            # Jitter the step size (+/-20%) each iteration so a fixed trajectory
+            # length can't resonate with a near-quadratic target's period and
+            # trap the chain in a deterministic back-and-forth swing (Neal, 2011).
+            eps = step_size * rng.uniform(0.8, 1.2)
+
             p0 = rng.normal()
             q = current
-            p = p0 + 0.5 * step_size * grad_log_target(q)
+            p = p0 + 0.5 * eps * grad_log_target(q)
 
             for step in range(n_leapfrog):
-                q = q + step_size * p
+                q = q + eps * p
                 if step != n_leapfrog - 1:
-                    p = p + step_size * grad_log_target(q)
+                    p = p + eps * grad_log_target(q)
 
             log_q = log_target(q)
-            p = p + 0.5 * step_size * grad_log_target(q)
+            p = p + 0.5 * eps * grad_log_target(q)
 
             if np.isfinite(log_q) and np.isfinite(p):
                 log_alpha = (log_q - 0.5 * p ** 2) - (log_current - 0.5 * p0 ** 2)

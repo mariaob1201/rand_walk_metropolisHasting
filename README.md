@@ -24,18 +24,20 @@ rand_walk_metropolisHasting/
 ├── src/
 │   ├── samplers/
 │   │   ├── random_walk.py  # Generic RWMH — accepts any log_target callable
-│   │   └── hmc.py           # Hamiltonian Monte Carlo (scaffolded, not yet implemented)
-│   ├── targets.py       # Log-posterior factories (Normal mean, bimodal mixture)
+│   │   └── hmc.py           # Hamiltonian Monte Carlo — leapfrog integrator, jittered step size
+│   ├── targets.py       # Log-posterior + gradient factories (Normal mean, bimodal mixture)
 │   ├── diagnostics.py   # ESS, Gelman-Rubin R-hat, autocorrelation
 │   └── plots.py         # Trace, ACF, posterior density, convergence plots
 ├── examples/
-│   ├── normal_mean.py   # Bayesian inference on a normal mean (Cauchy prior)
-│   └── mixture.py       # Bimodal Gaussian mixture — proposal-width study
+│   ├── normal_mean.py       # Bayesian inference on a normal mean (Cauchy prior)
+│   ├── mixture.py           # Bimodal Gaussian mixture — proposal-width study
+│   └── compare_samplers.py  # RWM vs HMC — acceptance, ESS, ESS/sec, R-hat, overlay plots
 ├── notebooks/
 │   └── demo.ipynb       # Step-by-step research walkthrough
 ├── tests/
 │   └── samplers/
-│       └── test_random_walk.py  # Pytest suite (shapes, convergence, diagnostics)
+│       ├── test_random_walk.py  # Pytest suite (shapes, convergence, diagnostics)
+│       └── test_hmc.py           # Same, plus a finite-difference gradient check
 ├── outputs/             # Generated plots (gitignored, directory kept)
 ├── main.py              # Original single-file script (reference)
 └── requirements.txt
@@ -91,6 +93,25 @@ chains = result["samples"]          # shape (n_chains, n_kept)
 rates  = result["acceptance_rates"] # shape (n_chains,)
 ```
 
+HMC has the same call shape, plus a required gradient and its own tuning knobs (`step_size`, `n_leapfrog` instead of `cand_std`):
+
+```python
+from src.samplers import hamiltonian_monte_carlo
+
+result = hamiltonian_monte_carlo(
+    log_target      = my_log_posterior,
+    grad_log_target = my_grad_log_posterior,  # callable: float -> float
+    init            = 0.0,
+    n_iter          = 5_000,
+    step_size       = 0.05,   # leapfrog step size (epsilon)
+    n_leapfrog      = 20,     # leapfrog steps per proposal (L)
+    burn_in         = 500,
+    thin            = 1,
+    n_chains        = 4,
+    seed            = 42,
+)
+```
+
 ---
 
 ## Diagnostics
@@ -124,6 +145,9 @@ python -m examples.normal_mean
 # Example 2 — Bimodal mixture (proposal-width comparison)
 python -m examples.mixture
 
+# Example 3 — RWM vs HMC comparison
+python -m examples.compare_samplers
+
 # Tests
 python -m pytest tests/ -v
 
@@ -154,20 +178,40 @@ All plots are saved to `outputs/`.
 | Narrow (σ = 0.5) | ~0.85 | No — chain gets stuck | > 1.1 |
 | Wide (σ = 3.0) | ~0.35 | Yes | < 1.05 |
 
+### RWM vs HMC (`examples/compare_samplers.py`)
+
+| Model | Sampler | Accept | ESS (per 4500 kept) | ESS/sec | R-hat |
+|---|---|---|---|---|---|
+| Normal mean | RWM | ~0.43 | ~985 | ~29,000 | ~1.00 |
+| Normal mean | HMC | ~0.999 | ~4500 (≈ i.i.d.) | ~30,000 | ~1.00 |
+| Bimodal mixture | RWM (σ=3.0) | ~0.41 | ~1080 | ~8,800 | ~1.00 |
+| Bimodal mixture | HMC | ~0.999 | ~85 | ~50 | ~1.01 |
+
+On the near-quadratic normal-mean posterior, gradient information lets HMC produce
+almost independent draws per iteration. On the bimodal target, a single HMC trajectory
+rarely has enough kinetic energy to cross the low-density valley between modes in one
+leap — it still visits both modes over many iterations (R-hat converges), but with much
+higher autocorrelation and ~30x the wall-clock cost per iteration (`n_leapfrog` gradient
+evaluations vs. one density evaluation for RWM), so its ESS/sec is far lower here. This
+is a known limitation of vanilla fixed-trajectory HMC on multimodal targets — real fixes
+are tempering, NUTS-style adaptive trajectory lengths, or better initialisation.
+
 ---
 
 ## Adding a new target
 
 1. Add a `my_log_target(x: float) -> float` function to `src/targets.py`
 2. Pass it directly to `metropolis_hastings(log_target=my_log_target, ...)`
-3. No other changes needed
+3. If you also want to use it with a gradient-based sampler (HMC), add a matching
+   `grad_my_log_target(x: float) -> float` next to it
+4. No other changes needed
 
 ---
 
 ## Adding a new sampler
 
 Each algorithm lives in its own module under `src/samplers/`, exposed through `src/samplers/__init__.py`.
-To add one (e.g. HMC, which is scaffolded in `src/samplers/hmc.py` but not yet implemented):
+`src/samplers/hmc.py` is a worked example of adding one alongside the original RWM sampler.
 
 1. Write `src/samplers/<name>.py` with a function matching the existing signature style:
    accepts `log_target` (plus whatever the algorithm needs, e.g. `grad_log_target` for HMC),
@@ -176,6 +220,7 @@ To add one (e.g. HMC, which is scaffolded in `src/samplers/hmc.py` but not yet i
    drop-in replacement for `metropolis_hastings` in examples, diagnostics, and plots.
 2. Export it from `src/samplers/__init__.py`.
 3. Add tests under `tests/samplers/test_<name>.py`.
+4. Optionally add it to `examples/compare_samplers.py` for a side-by-side benchmark.
 
 ---
 
