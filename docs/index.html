@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Value Landscape</title>
+<meta name="description" content="Paint walls, a goal, and a pit onto a grid and watch synchronous value iteration converge live — heatmap, policy arrows, and a Bellman-backup inspector for the selected cell.">
+<style>
+  :root{
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --hairline:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10);
+    --accent:#8a6a22; --accent-strong:#6e5419; --accent-soft:#efe3c9; --accent-ink:#ffffff;
+    --good:#0ca30c; --critical:#d03b3b;
+    --div-pos:#2a78d6; --div-neg:#e34948; --div-mid:#f0efec;
+    --focus-ring: 0 0 0 3px rgba(138,106,34,.35);
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    --font-serif: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])){
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+      --hairline:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
+      --accent:#d1a24f; --accent-strong:#e6bb6c; --accent-soft:rgba(209,162,79,.16); --accent-ink:#1a1400;
+      --good:#0ca30c; --critical:#d03b3b;
+      --div-pos:#3987e5; --div-neg:#e66767; --div-mid:#383835;
+      --focus-ring: 0 0 0 3px rgba(209,162,79,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --hairline:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
+    --accent:#d1a24f; --accent-strong:#e6bb6c; --accent-soft:rgba(209,162,79,.16); --accent-ink:#1a1400;
+    --good:#0ca30c; --critical:#d03b3b;
+    --div-pos:#3987e5; --div-neg:#e66767; --div-mid:#383835;
+    --focus-ring: 0 0 0 3px rgba(209,162,79,.35);
+  }
+  :root[data-theme="light"]{
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --hairline:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10);
+    --accent:#8a6a22; --accent-strong:#6e5419; --accent-soft:#efe3c9; --accent-ink:#ffffff;
+    --good:#0ca30c; --critical:#d03b3b;
+    --div-pos:#2a78d6; --div-neg:#e34948; --div-mid:#f0efec;
+    --focus-ring: 0 0 0 3px rgba(138,106,34,.35);
+  }
+
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--page); color:var(--ink);
+    font-family:var(--font-serif);
+    min-height:100vh;
+  }
+  .app{ max-width:1180px; margin:0 auto; padding:2.25rem 1.5rem 3rem; }
+
+  /* ---------- masthead ---------- */
+  .masthead{ margin-bottom:1.75rem; }
+  .masthead h1{
+    font-family:var(--font-mono); font-weight:700;
+    font-size:clamp(1.35rem,1.1rem + 1vw,1.9rem);
+    letter-spacing:.02em; margin:0 0 .35rem;
+    text-wrap:balance;
+  }
+  .masthead .thesis{
+    font-family:var(--font-serif); font-style:italic; color:var(--ink-2);
+    font-size:1rem; max-width:62ch; margin:0 0 .9rem; line-height:1.5;
+  }
+  .equation{
+    font-family:var(--font-mono); font-size:.82rem; color:var(--ink-2);
+    background:var(--surface); border:1px solid var(--border); border-radius:4px;
+    padding:.55rem .8rem; display:inline-block; letter-spacing:.01em;
+    font-variant-numeric:tabular-nums;
+  }
+  .equation b{ color:var(--ink); font-weight:600; }
+
+  /* ---------- workspace layout ---------- */
+  .workspace{ display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:1.5rem; align-items:start; }
+  @media (max-width:900px){ .workspace{ grid-template-columns:1fr; } }
+
+  .panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    padding:1rem 1.1rem;
+  }
+
+  /* ---------- board toolbar ---------- */
+  .board-toolbar{
+    display:flex; flex-wrap:wrap; align-items:center; gap:.6rem;
+    margin-bottom:.85rem;
+  }
+  .toolgroup{ display:flex; gap:2px; background:var(--hairline); border-radius:5px; padding:2px; }
+  .tool-btn{
+    font-family:var(--font-mono); font-size:.68rem; text-transform:uppercase; letter-spacing:.06em;
+    border:none; background:transparent; color:var(--ink-2);
+    padding:.4rem .6rem; border-radius:3px; cursor:pointer;
+    display:flex; align-items:center; gap:.4rem; line-height:1;
+  }
+  .tool-btn .swatch{ width:.62rem; height:.62rem; border-radius:2px; flex:none; display:inline-block; }
+  .tool-btn[aria-checked="true"]{ background:var(--surface); color:var(--ink); box-shadow:0 1px 0 var(--border); }
+  .tool-btn:hover{ color:var(--ink); }
+  .tool-btn:focus-visible{ outline:none; box-shadow:var(--focus-ring); }
+
+  .run-controls{ display:flex; align-items:center; gap:.4rem; margin-left:auto; }
+  .btn{
+    font-family:var(--font-mono); font-size:.7rem; text-transform:uppercase; letter-spacing:.06em;
+    border:1px solid var(--border); background:var(--surface); color:var(--ink);
+    padding:.45rem .75rem; border-radius:4px; cursor:pointer;
+  }
+  .btn:hover{ border-color:var(--accent); }
+  .btn:focus-visible{ outline:none; box-shadow:var(--focus-ring); }
+  .btn:disabled{ opacity:.4; cursor:default; }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
+  .btn.primary:hover{ background:var(--accent-strong); border-color:var(--accent-strong); }
+
+  .readout-strip{
+    display:flex; gap:1.4rem; align-items:baseline; margin:.15rem 0 .85rem;
+    font-family:var(--font-mono); font-size:.72rem; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.05em;
+  }
+  .readout-strip b{
+    font-family:var(--font-mono); font-size:.95rem; color:var(--ink); text-transform:none;
+    letter-spacing:0; font-variant-numeric:tabular-nums; margin-left:.35rem;
+  }
+  .converged{
+    font-family:var(--font-mono); font-size:.68rem; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--good); border:1px solid var(--good); border-radius:3px; padding:.15rem .45rem;
+  }
+  .converged[hidden]{ display:none; }
+
+  /* ---------- board ---------- */
+  .board{
+    display:grid;
+    grid-template-columns:repeat(10, 1fr);
+    gap:2px; background:var(--hairline);
+    border:1px solid var(--border); border-radius:4px; overflow:hidden;
+    max-width:640px; user-select:none; -webkit-user-select:none;
+    touch-action:none;
+  }
+  .cell{
+    position:relative; aspect-ratio:1; background:var(--div-mid);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; border:none; padding:0; color:var(--ink);
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .cell{ transition:background-color .15s ease; }
+  }
+  .cell:focus-visible{ outline:none; box-shadow:inset var(--focus-ring); z-index:1; }
+  .cell[data-sign="pos"]{ background:color-mix(in oklch, var(--div-mid), var(--div-pos) calc(var(--v-t, 0) * 100%)); }
+  .cell[data-sign="neg"]{ background:color-mix(in oklch, var(--div-mid), var(--div-neg) calc(var(--v-t, 0) * 100%)); }
+  .cell[data-type="wall"]{
+    background:
+      repeating-linear-gradient(45deg, var(--baseline) 0 2px, transparent 2px 7px),
+      var(--surface);
+    cursor:default;
+  }
+  .cell[data-type="goal"]{ background:var(--good); color:#fff; }
+  .cell[data-type="pit"]{ background:var(--critical); color:#fff; }
+  .cell[data-inspected="true"]{ box-shadow:inset 0 0 0 2px var(--accent); z-index:1; }
+
+  .cell-arrow{ font-size:1.05rem; line-height:1; }
+  .cell-value{
+    font-family:var(--font-mono); font-size:.56rem; margin-top:.1rem;
+    font-variant-numeric:tabular-nums; opacity:.85;
+  }
+  .cell-term{ font-family:var(--font-mono); font-weight:700; font-size:1.1rem; }
+
+  /* ---------- legend ---------- */
+  .legend{ margin-top:.85rem; max-width:640px; }
+  .legend-bar{
+    height:10px; border-radius:2px;
+    background:linear-gradient(to right, var(--div-neg), var(--div-mid), var(--div-pos));
+    border:1px solid var(--border);
+  }
+  .legend-labels{
+    display:flex; justify-content:space-between; margin-top:.3rem;
+    font-family:var(--font-mono); font-size:.66rem; color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ---------- control rail ---------- */
+  .control-pane{ display:flex; flex-direction:column; gap:1rem; }
+  .panel h2{
+    font-family:var(--font-mono); font-size:.7rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--muted); margin:0 0 .8rem; font-weight:600;
+  }
+  .field{ margin-bottom:.95rem; }
+  .field:last-child{ margin-bottom:0; }
+  .field-label{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-family:var(--font-mono); font-size:.72rem; color:var(--ink-2); margin-bottom:.35rem;
+  }
+  .field-label span:last-child{ color:var(--ink); font-variant-numeric:tabular-nums; }
+  input[type="range"]{
+    -webkit-appearance:none; appearance:none; width:100%; height:2px;
+    background:var(--baseline); border-radius:1px; outline:none; margin:0;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--accent); border:2px solid var(--surface); box-shadow:0 0 0 1px var(--border);
+    cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%; background:var(--accent);
+    border:2px solid var(--surface); box-shadow:0 0 0 1px var(--border); cursor:pointer;
+  }
+  input[type="range"]:focus-visible{ box-shadow:none; }
+  input[type="range"]:focus-visible::-webkit-slider-thumb{ box-shadow:var(--focus-ring); }
+
+  .howto{ font-family:var(--font-serif); font-size:.86rem; color:var(--ink-2); line-height:1.55; margin:0; }
+
+  /* ---------- inspector ---------- */
+  .inspector-placeholder{ font-family:var(--font-serif); font-style:italic; color:var(--muted); font-size:.85rem; margin:0; }
+  .inspector-head{
+    font-family:var(--font-mono); font-size:.75rem; color:var(--ink); margin:0 0 .7rem;
+    display:flex; justify-content:space-between; font-variant-numeric:tabular-nums;
+  }
+  .qrow{ display:grid; grid-template-columns:1.4rem 1fr 3.2rem; align-items:center; gap:.5rem; margin-bottom:.4rem; }
+  .qrow .glyph{ font-size:1rem; text-align:center; color:var(--ink-2); }
+  .qrow.best .glyph{ color:var(--accent); font-weight:700; }
+  .qtrack{ position:relative; height:8px; background:var(--hairline); border-radius:2px; overflow:hidden; }
+  .qfill{ position:absolute; top:0; bottom:0; border-radius:2px; }
+  .qrow .qval{ font-family:var(--font-mono); font-size:.72rem; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink-2); }
+  .qrow.best .qval{ color:var(--ink); font-weight:600; }
+
+  .breakdown{
+    margin-top:.85rem; padding-top:.8rem; border-top:1px solid var(--hairline);
+    font-family:var(--font-mono); font-size:.68rem; color:var(--ink-2); line-height:1.75;
+  }
+  .breakdown .line{ display:flex; justify-content:space-between; gap:.5rem; }
+  .breakdown .total{ margin-top:.4rem; padding-top:.4rem; border-top:1px dashed var(--hairline); color:var(--ink); font-weight:600; }
+  .breakdown .total b{ color:var(--accent); }
+
+  footer{
+    margin-top:2rem; padding-top:1rem; border-top:1px solid var(--hairline);
+    font-family:var(--font-mono); font-size:.68rem; color:var(--muted); letter-spacing:.02em;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="masthead">
+    <h1>VALUE LANDSCAPE</h1>
+    <p class="thesis">A field instrument for the Bellman equation — paint a world, run synchronous value iteration, and watch the terrain and its policy settle.</p>
+    <div class="equation"><b>V(s)</b> = max<sub>a</sub> Σ<sub>s′</sub> P(s′|s,a) · [ R(s,a,s′) + γ·V(s′) ]</div>
+  </header>
+
+  <main class="workspace">
+    <section class="board-pane">
+      <div class="panel">
+        <div class="board-toolbar">
+          <div class="toolgroup" id="toolgroup" role="radiogroup" aria-label="Paint tool">
+            <button class="tool-btn" data-tool="inspect" role="radio" aria-checked="true">Inspect</button>
+            <button class="tool-btn" data-tool="wall" role="radio" aria-checked="false"><span class="swatch" style="background:repeating-linear-gradient(45deg, var(--baseline) 0 1px, transparent 1px 3px), var(--surface); box-shadow:inset 0 0 0 1px var(--border);"></span>Wall</button>
+            <button class="tool-btn" data-tool="goal" role="radio" aria-checked="false"><span class="swatch" style="background:var(--good);"></span>Goal +1</button>
+            <button class="tool-btn" data-tool="pit" role="radio" aria-checked="false"><span class="swatch" style="background:var(--critical);"></span>Pit −1</button>
+            <button class="tool-btn" data-tool="empty" role="radio" aria-checked="false">Erase</button>
+          </div>
+          <div class="run-controls">
+            <button class="btn" id="stepBtn">Step</button>
+            <button class="btn primary" id="runBtn">Run</button>
+            <button class="btn" id="resetBtn">Reset values</button>
+            <button class="btn" id="clearBtn">Clear grid</button>
+          </div>
+        </div>
+
+        <div class="readout-strip">
+          <span>Sweep<b id="iterOut">0</b></span>
+          <span>Max Δ<b id="deltaOut">—</b></span>
+          <span id="convergedBadge" class="converged" hidden>Converged</span>
+        </div>
+
+        <div class="board" id="board" role="grid" aria-label="Grid world"></div>
+
+        <div class="legend">
+          <div class="legend-bar"></div>
+          <div class="legend-labels">
+            <span id="legendMin">−0.05</span>
+            <span>0</span>
+            <span id="legendMax">+0.05</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="control-pane">
+      <div class="panel">
+        <h2>Parameters</h2>
+        <div class="field">
+          <div class="field-label"><span>Discount γ</span><span id="gammaOut">0.90</span></div>
+          <input type="range" id="gamma" min="0.5" max="0.99" step="0.01" value="0.9">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Step cost</span><span id="livingOut">−0.04</span></div>
+          <input type="range" id="living" min="-0.5" max="0" step="0.01" value="-0.04">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Slip noise</span><span id="noiseOut">0.20</span></div>
+          <input type="range" id="noise" min="0" max="0.3" step="0.01" value="0.2">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Run speed</span><span id="speedOut">mid</span></div>
+          <input type="range" id="speed" min="0" max="100" step="1" value="55">
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Bellman backup</h2>
+        <div id="inspector"><p class="inspector-placeholder">Select the Inspect tool, then click any open cell to see its backup computed live.</p></div>
+      </div>
+
+      <div class="panel">
+        <h2>How to read it</h2>
+        <p class="howto">Color is each state's current value — blue positive, red negative, gray near zero. The arrow is its current greedy policy. Both are recomputed from scratch every sweep, so editing the world mid-run reshapes the landscape in front of you.</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    SYNCHRONOUS VALUE ITERATION · STOCHASTIC GRIDWORLD (1−NOISE INTENDED, NOISE⁄2 EACH SIDE) · TERMINAL CELLS ABSORB REWARD, NO FURTHER DISCOUNTING
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const ROWS = 7, COLS = 10;
+  const DIRS = {
+    up:    {dr:-1, dc:0, glyph:'↑', label:'Up',    perp:['left','right']},
+    down:  {dr:1,  dc:0, glyph:'↓', label:'Down',  perp:['left','right']},
+    left:  {dr:0,  dc:-1, glyph:'←', label:'Left',  perp:['up','down']},
+    right: {dr:0,  dc:1,  glyph:'→', label:'Right', perp:['up','down']},
+  };
+  const ACTIONS = ['up','down','left','right'];
+
+  let type = [], V = [];
+  let iter = 0, lastDelta = null;
+  let tool = 'inspect';
+  let inspected = null;
+  let running = false, timer = null;
+  let pointerActive = false;
+
+  const board = document.getElementById('board');
+  const cellEls = [];
+
+  function idx(r,c){ return r*COLS+c; }
+  function inBounds(r,c){ return r>=0 && r<ROWS && c>=0 && c<COLS; }
+
+  function buildBoard(){
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const el = document.createElement('div');
+        el.className = 'cell';
+        el.setAttribute('role','gridcell');
+        el.setAttribute('tabindex','0');
+        el.dataset.r = r; el.dataset.c = c;
+        el.innerHTML = '<span class="cell-arrow"></span><span class="cell-value"></span><span class="cell-term"></span>';
+        board.appendChild(el);
+        cellEls[idx(r,c)] = el;
+      }
+    }
+  }
+
+  function defaultLayout(){
+    type = Array.from({length:ROWS}, () => Array(COLS).fill('empty'));
+    type[1][8] = 'goal';
+    type[4][4] = 'pit';
+    type[2][5] = 'wall'; type[3][5] = 'wall'; type[4][5] = 'wall';
+  }
+
+  function resetValues(){
+    V = Array.from({length:ROWS}, (_, r) => Array.from({length:COLS}, (_, c) => {
+      if(type[r][c] === 'goal') return 1;
+      if(type[r][c] === 'pit') return -1;
+      return 0;
+    }));
+    iter = 0; lastDelta = null;
+  }
+
+  function params(){
+    return {
+      gamma: parseFloat(gammaSlider.value),
+      living: parseFloat(livingSlider.value),
+      noise: parseFloat(noiseSlider.value),
+    };
+  }
+
+  function outcomeCell(r,c,dir){
+    const d = DIRS[dir];
+    const nr = r + d.dr, nc = c + d.dc;
+    if(!inBounds(nr,nc) || type[nr][nc] === 'wall') return {r, c};
+    return {r:nr, c:nc};
+  }
+
+  function rewardFor(cellType, living){
+    if(cellType === 'goal') return 1;
+    if(cellType === 'pit') return -1;
+    return living;
+  }
+
+  function actionBreakdown(r,c,action,Vsnap,p){
+    const d = DIRS[action];
+    const outs = [
+      {dir:action, prob:1-p.noise},
+      {dir:d.perp[0], prob:p.noise/2},
+      {dir:d.perp[1], prob:p.noise/2},
+    ];
+    let q = 0;
+    const parts = outs.map(o => {
+      const {r:nr,c:nc} = outcomeCell(r,c,o.dir);
+      const cellType = type[nr][nc];
+      const reward = rewardFor(cellType, p.living);
+      const cont = (cellType === 'goal' || cellType === 'pit') ? 0 : Vsnap[nr][nc];
+      const val = reward + p.gamma * cont;
+      q += o.prob * val;
+      return {dir:o.dir, prob:o.prob, r:nr, c:nc, cellType, reward, cont, val};
+    });
+    return {action, q, parts};
+  }
+
+  function allActionInfo(r,c,Vsnap,p){
+    const infos = ACTIONS.map(a => actionBreakdown(r,c,a,Vsnap,p));
+    let best = infos[0];
+    for(const info of infos) if(info.q > best.q) best = info;
+    return {infos, best};
+  }
+
+  function sweep(){
+    const p = params();
+    const newV = V.map(row => row.slice());
+    let maxDelta = 0;
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        if(type[r][c] !== 'empty') continue;
+        const {best} = allActionInfo(r,c,V,p);
+        newV[r][c] = best.q;
+        maxDelta = Math.max(maxDelta, Math.abs(best.q - V[r][c]));
+      }
+    }
+    V = newV;
+    iter++;
+    lastDelta = maxDelta;
+    return maxDelta;
+  }
+
+  function fmt(n){ return (n>=0?'+':'') + n.toFixed(2); }
+  function fmt3(n){ return (n>=0?'+':'') + n.toFixed(3); }
+
+  function render(){
+    const p = params();
+    let maxAbs = 0.05;
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+      if(type[r][c] === 'empty') maxAbs = Math.max(maxAbs, Math.abs(V[r][c]));
+
+    legendMin.textContent = (-maxAbs).toFixed(2);
+    legendMax.textContent = ('+' + maxAbs.toFixed(2));
+
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const el = cellEls[idx(r,c)];
+        const t = type[r][c];
+        el.dataset.type = t;
+        const arrowEl = el.querySelector('.cell-arrow');
+        const valueEl = el.querySelector('.cell-value');
+        const termEl = el.querySelector('.cell-term');
+        arrowEl.textContent = ''; valueEl.textContent = ''; termEl.textContent = '';
+        el.removeAttribute('data-sign');
+        el.style.removeProperty('--v-t');
+
+        if(t === 'wall'){
+          el.setAttribute('aria-label', `Row ${r+1}, column ${c+1}, wall`);
+        } else if(t === 'goal'){
+          termEl.textContent = '+1';
+          el.setAttribute('aria-label', `Row ${r+1}, column ${c+1}, goal, reward plus one`);
+        } else if(t === 'pit'){
+          termEl.textContent = '−1';
+          el.setAttribute('aria-label', `Row ${r+1}, column ${c+1}, pit, reward minus one`);
+        } else {
+          const v = V[r][c];
+          const tNorm = Math.min(1, Math.abs(v) / maxAbs);
+          el.style.setProperty('--v-t', tNorm.toFixed(3));
+          el.dataset.sign = v >= 0 ? 'pos' : 'neg';
+          if(iter > 0){
+            const info = allActionInfo(r,c,V,p);
+            arrowEl.textContent = DIRS[info.best.action].glyph;
+          }
+          valueEl.textContent = v.toFixed(2);
+          el.setAttribute('aria-label', `Row ${r+1}, column ${c+1}, value ${v.toFixed(2)}`);
+        }
+
+        if(inspected && inspected.r === r && inspected.c === c){
+          el.setAttribute('data-inspected','true');
+        } else {
+          el.removeAttribute('data-inspected');
+        }
+      }
+    }
+
+    iterOut.textContent = iter;
+    deltaOut.textContent = lastDelta === null ? '—' : lastDelta.toFixed(4);
+    convergedBadge.hidden = !(lastDelta !== null && lastDelta < 0.001);
+
+    renderInspector(p);
+  }
+
+  function renderInspector(p){
+    if(!inspected){
+      inspector.innerHTML = '<p class="inspector-placeholder">Select the Inspect tool, then click any open cell to see its backup computed live.</p>';
+      return;
+    }
+    const {r,c} = inspected;
+    const t = type[r][c];
+    const loc = `Row ${r+1}, Col ${c+1}`;
+
+    if(t === 'wall'){
+      inspector.innerHTML = `<p class="inspector-head"><span>${loc}</span><span>WALL</span></p><p class="inspector-placeholder">Walls hold no value — an agent bumping into one stays put and pays the step cost.</p>`;
+      return;
+    }
+    if(t === 'goal' || t === 'pit'){
+      const label = t === 'goal' ? 'GOAL' : 'PIT';
+      const reward = t === 'goal' ? '+1' : '−1';
+      inspector.innerHTML = `<p class="inspector-head"><span>${loc}</span><span>${label}</span></p><p class="inspector-placeholder">Terminal cell. Its value is fixed at its own reward, ${reward}, and never updated by a backup.</p>`;
+      return;
+    }
+
+    const {infos, best} = allActionInfo(r,c,V,p);
+    const maxAbsQ = Math.max(0.05, ...infos.map(i => Math.abs(i.q)));
+
+    const rows = infos.map(info => {
+      const isBest = info.action === best.action;
+      const t2 = Math.min(1, Math.abs(info.q) / maxAbsQ);
+      const sign = info.q >= 0 ? 'pos' : 'neg';
+      const fillColor = sign === 'pos'
+        ? `color-mix(in oklch, var(--div-mid), var(--div-pos) ${(t2*100).toFixed(0)}%)`
+        : `color-mix(in oklch, var(--div-mid), var(--div-neg) ${(t2*100).toFixed(0)}%)`;
+      const side = sign === 'pos' ? `left:50%; width:${(t2*50).toFixed(1)}%;` : `right:50%; width:${(t2*50).toFixed(1)}%;`;
+      return `<div class="qrow${isBest ? ' best' : ''}">
+        <span class="glyph">${DIRS[info.action].glyph}</span>
+        <span class="qtrack"><span class="qfill" style="${side} background:${fillColor};"></span></span>
+        <span class="qval">${fmt(info.q)}</span>
+      </div>`;
+    }).join('');
+
+    const parts = best.parts.map(part => {
+      const contStr = (part.cellType === 'goal' || part.cellType === 'pit') ? '0 (terminal)' : part.cont.toFixed(3);
+      return `<div class="line">
+        <span>${(part.prob*100).toFixed(0)}% → (${part.r+1},${part.c+1})</span>
+        <span>${fmt3(part.reward)} + γ·${contStr}</span>
+      </div>`;
+    }).join('');
+
+    inspector.innerHTML = `
+      <p class="inspector-head"><span>${loc}</span><span>V = ${fmt(V[r][c])}</span></p>
+      ${rows}
+      <div class="breakdown">
+        <div class="line"><span>Best action</span><span>${DIRS[best.action].label} ${DIRS[best.action].glyph}</span></div>
+        ${parts}
+        <div class="line total"><span>V(s) ←</span><span><b>${fmt3(best.q)}</b></span></div>
+      </div>
+    `;
+  }
+
+  // ---------- interaction ----------
+
+  function applyTool(r,c){
+    if(tool === 'inspect'){
+      inspected = {r,c};
+      render();
+      return;
+    }
+    if(type[r][c] === tool) return;
+    type[r][c] = tool;
+    V[r][c] = tool === 'goal' ? 1 : tool === 'pit' ? -1 : 0;
+    render();
+  }
+
+  function cellFromEvent(e){
+    const el = e.target.closest('.cell');
+    if(!el) return null;
+    return {r:+el.dataset.r, c:+el.dataset.c};
+  }
+
+  board.addEventListener('pointerdown', e => {
+    const cell = cellFromEvent(e);
+    if(!cell) return;
+    pointerActive = true;
+    applyTool(cell.r, cell.c);
+  });
+  board.addEventListener('pointermove', e => {
+    if(!pointerActive || tool === 'inspect') return;
+    const cell = cellFromEvent(e);
+    if(!cell) return;
+    applyTool(cell.r, cell.c);
+  });
+  window.addEventListener('pointerup', () => { pointerActive = false; });
+  board.addEventListener('keydown', e => {
+    if(e.key !== 'Enter' && e.key !== ' ') return;
+    const cell = cellFromEvent(e);
+    if(!cell) return;
+    e.preventDefault();
+    applyTool(cell.r, cell.c);
+  });
+
+  const toolgroup = document.getElementById('toolgroup');
+  toolgroup.addEventListener('click', e => {
+    const btn = e.target.closest('.tool-btn');
+    if(!btn) return;
+    tool = btn.dataset.tool;
+    toolgroup.querySelectorAll('.tool-btn').forEach(b => b.setAttribute('aria-checked', String(b === btn)));
+  });
+
+  const gammaSlider = document.getElementById('gamma');
+  const livingSlider = document.getElementById('living');
+  const noiseSlider = document.getElementById('noise');
+  const speedSlider = document.getElementById('speed');
+  const gammaOut = document.getElementById('gammaOut');
+  const livingOut = document.getElementById('livingOut');
+  const noiseOut = document.getElementById('noiseOut');
+  const speedOut = document.getElementById('speedOut');
+  const iterOut = document.getElementById('iterOut');
+  const deltaOut = document.getElementById('deltaOut');
+  const convergedBadge = document.getElementById('convergedBadge');
+  const legendMin = document.getElementById('legendMin');
+  const legendMax = document.getElementById('legendMax');
+  const inspector = document.getElementById('inspector');
+  const stepBtn = document.getElementById('stepBtn');
+  const runBtn = document.getElementById('runBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const clearBtn = document.getElementById('clearBtn');
+
+  function syncSliderLabels(){
+    gammaOut.textContent = parseFloat(gammaSlider.value).toFixed(2);
+    livingOut.textContent = parseFloat(livingSlider.value).toFixed(2).replace('-','−');
+    noiseOut.textContent = parseFloat(noiseSlider.value).toFixed(2);
+    const s = parseInt(speedSlider.value,10);
+    speedOut.textContent = s < 33 ? 'slow' : s < 67 ? 'mid' : 'fast';
+  }
+  [gammaSlider, livingSlider, noiseSlider].forEach(s => s.addEventListener('input', () => { syncSliderLabels(); render(); }));
+  speedSlider.addEventListener('input', () => { syncSliderLabels(); if(running) restartTimer(); });
+
+  function currentSpeedMs(){
+    const v = parseInt(speedSlider.value,10);
+    return Math.round(820 - v * 7.8);
+  }
+  function restartTimer(){
+    clearInterval(timer);
+    timer = setInterval(tick, currentSpeedMs());
+  }
+  function tick(){
+    const d = sweep();
+    render();
+    if(d < 0.001) stopRun();
+  }
+  function startRun(){
+    if(running) return;
+    running = true;
+    runBtn.textContent = 'Pause';
+    stepBtn.disabled = true;
+    restartTimer();
+  }
+  function stopRun(){
+    running = false;
+    runBtn.textContent = 'Run';
+    stepBtn.disabled = false;
+    clearInterval(timer);
+  }
+
+  stepBtn.addEventListener('click', () => { sweep(); render(); });
+  runBtn.addEventListener('click', () => { running ? stopRun() : startRun(); });
+  resetBtn.addEventListener('click', () => { stopRun(); resetValues(); render(); });
+  clearBtn.addEventListener('click', () => {
+    stopRun();
+    type = Array.from({length:ROWS}, () => Array(COLS).fill('empty'));
+    inspected = null;
+    resetValues();
+    render();
+  });
+
+  buildBoard();
+  defaultLayout();
+  resetValues();
+  syncSliderLabels();
+  render();
+})();
+</script>
+</body>
+</html>
